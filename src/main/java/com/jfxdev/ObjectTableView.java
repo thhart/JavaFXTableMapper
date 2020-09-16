@@ -18,90 +18,108 @@ package com.jfxdev;
  *
  */
 
+import java.util.*;
+import javafx.beans.property.*;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.ObservableList;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
-import javafx.scene.control.cell.PropertyValueFactory;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
+import javafx.scene.control.*;
+import javafx.scene.control.TableColumn.CellDataFeatures;
+import javafx.scene.control.cell.*;
 
 /**
- * @author Dustin K. Redmond
- * @since 02/04/2020 15:39
- */
+ @author Dustin K. Redmond
+ @since 02/04/2020 15:39 */
 public class ObjectTableView<T> extends TableView<T> {
 
-    /**
-     * Constructs an {@code ObjectTableView} suitable for displaying objects of
-     * the specified model class.
-     * @param modelClass Class whose fields are to be used as {@code TableColumn}s
-     */
-    public ObjectTableView(Class<T> modelClass) {
-        new ArrayList<>(Arrays.asList(modelClass.getDeclaredFields())).forEach(field -> {
+   /**
+    Constructs an {@code ObjectTableView} suitable for displaying objects of
+    the specified model class.
+
+    @param modelClass Class whose fields are to be used as {@code TableColumn}s
+    */
+   public ObjectTableView(Class<T> modelClass) {
+      new ArrayList<>(Arrays.asList(modelClass.getDeclaredFields())).forEach(field -> {
+         if (Arrays.stream(field.getAnnotations()).noneMatch(annotation -> annotation.annotationType() == FieldNotShownInTable.class)) {
             String fieldName = field.getName();
-            TableColumn<T, ?> column = new TableColumn<>(fieldName);
-            column.setCellValueFactory(new PropertyValueFactory<>(fieldName));
-            this.getColumns().add(column);
-        });
-    }
-
-    /**
-     * Constructs an {@code ObjectTableView} suitable for displaying objects of the
-     * type passed as parameter. Sets the objects as table rows with the column names
-     * defaulting to the field names of the passed class.
-     * @param objects {@code ObservableList} of the objects to be used in the {@code TableView}
-     * @throws UnsupportedOperationException If no objects are passed.
-     * Use {@code new ObjectTableView(Class clazz)} instead.
-     */
-    public ObjectTableView(ObservableList<T> objects) throws UnsupportedOperationException {
-        if (objects == null || objects.size() == 0) {
-            throw new UnsupportedOperationException("The object list supplied when instantiating " +
-                    "com.jfxdev.ObjectTableView must not be null or size zero. Other constructors support this.");
-        }
-        new ArrayList<>(Arrays.asList(objects.get(0).getClass().getDeclaredFields())).forEach(field -> {
-            String fieldName = field.getName();
-            TableColumn<T, ?> column = new TableColumn<>(fieldName);
-            column.setCellValueFactory(new PropertyValueFactory<>(fieldName));
-            this.getColumns().add(column);
-        });
-        this.setItems(objects);
-    }
-
-    /**
-     * Renames a single table column. {@code ObjectTableView().applyColumnNameMapping()}
-     * should be preferred for renaming multiple {@code TableColumn}s at once,
-     * as renaming a single column requires searching through all columns in order
-     * to perform the rename operation.
-     * @param name {@code TableColumn}'s current name
-     * @param newName {@code TableColumn}'s intended name
-     */
-    public void renameColumn(String name, String newName) {
-        for (TableColumn<T, ?> col: this.getColumns()) {
-            if (col.getText().equals(name)) {
-                col.setText(newName);
-                break;
+            if (field.getType() == boolean.class) {
+               TableColumn<T, Boolean> column = new TableColumn<>(fieldName);
+               column.setCellValueFactory(
+                     p -> {
+                        final BooleanProperty booleanProperty = new SimpleBooleanProperty();
+                        final PropertyValueFactory<T, Boolean> factory = new PropertyValueFactory<>(fieldName);
+                        final ObservableValue<Boolean> observableValue = factory.call(new CellDataFeatures<>(ObjectTableView.this, column, p.getValue()));
+                        booleanProperty.bind(observableValue);
+                        return booleanProperty;
+                     });
+               column.setCellFactory(CheckBoxTableCell.forTableColumn(column));
+               this.getColumns().add(column);
+            } else {
+               TableColumn<T, ?> column = new TableColumn<>(fieldName);
+               column.setCellValueFactory(new PropertyValueFactory<>(fieldName));
+               this.getColumns().add(column);
             }
-        }
-    }
+         }
+      });
+   }
 
-    /**
-     * Applies column names from a {@code HashMap} where the key signifies the current
-     * column name and the value signifies the intended name. This should be preferred
-     * when renaming multiple columns, as the operation is faster than 
-     * {@code renameColumn(String name, String name)}.
-     * @param map {@code HashMap<String,String>} of structure: oldName/newName
-     */
-    public void applyColumnNameMapping(HashMap<String,String> map) {
-        if (map == null) {
-		throw new UnsupportedOperationException("Unable to apply column mapping with null map");
-	}
-	if (map.isEmpty()) return;
-        for (TableColumn<T, ?> col: this.getColumns()) {
-            if (map.containsKey(col.getText())) {
-                col.setText(map.get(col.getText()));
-            }
-        }
-    }
+   /**
+    Constructs an {@code ObjectTableView} suitable for displaying objects of the
+    type passed as parameter. Sets the objects as table rows with the column names
+    defaulting to the field names of the passed class.
+
+    @param objects {@code ObservableList} of the objects to be used in the {@code TableView}
+    @throws UnsupportedOperationException If no objects are passed.
+    Use {@code new ObjectTableView(Class clazz)} instead.
+    */
+   public ObjectTableView(ObservableList<T> objects) throws UnsupportedOperationException {
+      if (objects == null || objects.size() == 0) {
+         throw new UnsupportedOperationException("The object list supplied when instantiating " +
+               "com.jfxdev.ObjectTableView must not be null or size zero. Other constructors support this.");
+      }
+      new ArrayList<>(Arrays.asList(objects.get(0).getClass().getDeclaredFields())).forEach(field -> {
+         String fieldName = field.getName();
+         TableColumn<T, ?> column = new TableColumn<>(fieldName);
+         column.setCellValueFactory(new PropertyValueFactory<>(fieldName));
+         this.getColumns().add(column);
+      });
+      this.setItems(objects);
+   }
+
+   /**
+    Applies column names from a {@code HashMap} where the key signifies the current
+    column name and the value signifies the intended name. This should be preferred
+    when renaming multiple columns, as the operation is faster than
+    {@code renameColumn(String name, String name)}.
+
+    @param map {@code HashMap<String,String>} of structure: oldName/newName
+    */
+   public void applyColumnNameMapping(HashMap<String, String> map) {
+      if (map == null) {
+         throw new UnsupportedOperationException("Unable to apply column mapping with null map");
+      }
+      if (map.isEmpty()) return;
+      for (TableColumn<T, ?> col : this.getColumns()) {
+         if (map.containsKey(col.getText())) {
+            col.setText(map.get(col.getText()));
+         }
+      }
+   }
+
+   /**
+    Renames a single table column. {@code ObjectTableView().applyColumnNameMapping()}
+    should be preferred for renaming multiple {@code TableColumn}s at once,
+    as renaming a single column requires searching through all columns in order
+    to perform the rename operation.
+
+    @param name    {@code TableColumn}'s current name
+    @param newName {@code TableColumn}'s intended name
+    */
+   public void renameColumn(String name, String newName) {
+      for (TableColumn<T, ?> col : this.getColumns()) {
+         if (col.getText().equals(name)) {
+            col.setText(newName);
+            break;
+         }
+      }
+   }
 }
